@@ -43,27 +43,39 @@ provides just such a kind of limited dataflow mechanism.
 
 ## Usage
 
-This is a header-only library.  Simply put all the `.hpp` files
-wherever your compiler can find them and `#include <cells.hpp>`.
+This is a header-only library.  Simply put all the `.h` files
+wherever your compiler can find them and `#include <reactive.h>`.
 
 The API primarily consists of the `cell<T>` and `formula_cell<T>`
-class templates.  Using a `formula_cell<T>` is easy: simply construct
-one and use the `reset` method to set a formula to compute the value
-of the cell:
+class templates.  Using a `formula_cell<T>` is easy: either construct
+one, or use the `reset` method,
+with a formula to compute the value of the cell:
 
     typedef formula_cell<double> fcell;
     
-    fcell x;
+    fcell x([]{ return 5; });
+	
+	-or-
+	
+	fcell x;
     x.reset([](){ return 5; });
     
-For convenience, you can also just write something like `x->reset(5);`
-for setting a constant value.
+For convenience, you can also just write something like `x->reset(5);`,
+'x = reactive(5)', or 'x = 5' for setting a constant value.
 
 In order to create a dependent cell, simply make use of the other
-cell's value in the formula:
+cell's value in the function or use the other cell in an expression:
 
-    fcell double_x;
-    double_x.reset([&](){ return 2 * x.get(); });
+    fcell double_x([&](){ return 2 * x.get(); });
+	
+	-or-
+	
+	fcell double_x;
+	double_x.reset([&](){ return 2 * x.get(); });
+	
+	-or-
+	
+	fcell double_x = 2 * x;
 
 From now on, whenever `x` changes, `double_x` will be updated
 accordingly.
@@ -71,23 +83,40 @@ accordingly.
 You can create change event observers by writing formulas that make
 use of an observed cell and return a dummy value:
 
-    fcell simple_observer;
-    simple_observer.reset([&]() -> double {
+    fcell simple_observer([&]() -> double {
       (void)double_x.get();
       std::cout << "double_x has changed!" << std::endl;
       return 0;
     });
+	
+It is possible to make use of the c++11 'auto' keyword by assigning
+to the result of the 'reactive' function or by assigning to the result
+of an expression that involves a formula_cell. ex:
+
+	auto x = reactive(5);
+	auto double_x = x * 2;
+	
+The overloaded expression operators are '*','/','-', and '+'
+These operators are templated on two types, T (type on left) & R (type on right)
+and are also overloaded two ways (a third is planned for chaining expressions)
+A (formula_cell<T>,R) and a (T,formula_cell<R>)
+These operations will always result in a formula_cell<R>
+
+	auto x = reactive(2.5);
+	auto x_int = x * 2;				<-- Has a value of '4'
+	auto x_float = 2 * x;			<-- Has a value of '5'
 
 
 ## Acknowledgments
 
-This work was inspired by Kenny Tilton's Cells library, which extends
+This work extends Matthias Andreas Benkard's cellspp library,
+which is inspired by Kenny Tilton's Cells library, which extends
 the Common Lisp Object System with dataflow features.
 
 
 ## License
 
-Copyright 2012, Matthias Andreas Benkard.
+Copyright 2013, Grayson Andrew Hooper.
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU Lesser General Public License as
