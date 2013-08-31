@@ -61,7 +61,7 @@ with a formula to compute the value of the cell:
     x.reset([](){ return 5; });
     
 For convenience, you can also just write something like `x->reset(5);`,
-'x = reactive(5)', or 'x = 5' for setting a constant value.
+`x = reactive(5)`, or `x = 5` for setting a constant value.
 
 In order to create a dependent cell, simply make use of the other
 cell's value in the function or use the other cell in an expression:
@@ -89,8 +89,8 @@ use of an observed cell and return a dummy value:
       return 0;
     });
 	
-It is possible to make use of the c++11 'auto' keyword by assigning
-to the result of the 'reactive' function or by assigning to the result
+It is possible to make use of the c++11 `auto` keyword by assigning
+to the result of the `reactive` function or by assigning to the result
 of an expression that involves a formula_cell. ex:
 
 	auto x = reactive(5);
@@ -99,8 +99,8 @@ of an expression that involves a formula_cell. ex:
 The overloaded expression operators are '*','/','-', and '+'
 These operators are templated on two types, T (type on left) & R (type on right)
 and are also overloaded two ways (a third is planned for chaining expressions)
-A (formula_cell<T>,R) and a (T,formula_cell<R>)
-These operations will always result in a formula_cell<R>
+A `formula_cell<T>,R` and a `T,formula_cell<R>`
+These operations will always result in a `formula_cell<R>`
 
 	auto x = reactive(2.5);
 	auto x_int = x * 2;				<-- Has a value of '4'
