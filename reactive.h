@@ -23,6 +23,15 @@
 
 #include "observer.h"
 
+namespace {
+	template <typename ch>
+	ch char_sum(const ch* text,size_t N) {
+		ch tot=0;
+		for (auto i=0;i!=N-1;++i) tot += text[i];
+		return tot;
+	}
+}
+
 namespace cells {
 
 	// interface class that holds a value state
@@ -123,63 +132,202 @@ namespace cells {
 			virtual ~formula_cell() {}
 	};	
 
+
+
 	// helper function that enables use of auto when initializing a formula_cell with a constant value
 	// saying auto foo = 5 won't work as the type of foo would be int and not formula_cell<int>
 	template <typename T>
-	formula_cell<T> reactive(T val) {
+	formula_cell<T> lazy(T val) {
 		return val;
 	};
-
 	/*
+	can't infer the template type from a lambda
 	template <typename T>
-	formula_cell<T> reactive(const std::function<T ()>& val) {
+	formula_cell<T> lazy_func(std::function<T ()> val) {
 		return val;
 	};
 	*/
+
+	// reactive compare of a function_cell and another variable based on a passed char* comparison code	"lazy compare"
+	// accepted char* comparison codes: "==","!=","<","<=",">",">="
+	template <typename T,typename R>
+	formula_cell<bool> lazy_comp(formula_cell<T>& lhs,formula_cell<R>& rhs,const char* func,size_t N) {
+		/*
+		// Can't do switch(func) {	-- not allowed by the compilier
+		// Can do switch(sum(func)) { since chars are just numbers
+		// The sum of the passed characters will be unique to other accepted codes
+		// Note: Function will actually accept any sequence of characters that add up to accepted values for sw_char
+		*/
+
+		auto sw_char = ::char_sum(func,N);
+
+		switch(sw_char) {   // formula_cells are implicitly convertible
+			case 'z':	// '=' + '=' is 'z'	(in char codes)
+				return [&] { return lhs == (T)rhs; };
+			case '^':	// '!' + '=' is '^'	(in char codes)
+				return [&] { return lhs != (T)rhs; };
+			case '>':
+				return [&] { return lhs > (T)rhs; };
+			case '{':	// '>' + '=' is '{'  (in char codes)
+				return [&] { return lhs >= (T)rhs; };
+			case '<':
+				return [&] { return lhs < (T)rhs; };
+			case 'y':	// '<' + '=' is 'y'	(in char codes)
+				return [&] { return lhs <= (T)rhs; };
+			default:	// defaults to false if the passed code is not recognized
+				return false;
+		}
+	}
+	// overload for static char arrays
+	template <typename T,typename R,size_t N>
+	formula_cell<bool> lazy_comp(formula_cell<T>& lhs,formula_cell<R>& rhs,const char (&func) [N]) {
+		return lazy_comp(lhs,rhs,func,N);
+	}
+	// overload for right value comparison
+	template <typename T,typename R>
+	formula_cell<bool> lazy_comp(formula_cell<T>& lhs,R rhs,const char* func,size_t N) {
+		auto tot = ::char_sum(func,N);
+
+		switch(tot) {
+			case 'z':
+				return [=,&lhs] { return lhs == (T)rhs; };
+			case '^':
+				return [=,&lhs] { return lhs != (T)rhs; };
+			case '>':
+				return [=,&lhs] { return lhs > (T)rhs; };
+			case '{':
+				return [=,&lhs] { return lhs >= (T)rhs; };
+			case '<':
+				return [=,&lhs] { return lhs < (T)rhs; };
+			case 'y':
+				return [=,&lhs] { return lhs <= (T)rhs; };
+			default:
+				return false;
+		}
+	}
+	template <typename T,typename R,size_t N>
+	formula_cell<bool> lazy_comp(formula_cell<T>& lhs,R rhs,const char (&func) [N]) {
+		return lazy_comp(lhs,rhs,func,N);
+	}
+	// overload for left value comparison
+	template <typename T,typename R>
+	formula_cell<bool> lazy_comp(T lhs,formula_cell<R>& rhs,const char* func,size_t N) {
+		auto tot = ::char_sum(func,N);
+
+		switch(tot) {
+			case 'z':
+				return [=,&rhs] { return lhs == (T)rhs; };
+			case '^':
+				return [=,&rhs] { return lhs != (T)rhs; };
+			case '>':
+				return [=,&rhs] { return lhs > (T)rhs; };
+			case '{':
+				return [=,&rhs] { return lhs >= (T)rhs; };
+			case '<':
+				return [=,&rhs] { return lhs < (T)rhs; };
+			case 'y':
+				return [=,&rhs] { return lhs <= (T)rhs; };
+			default:
+				return false;
+		}
+	}
+	template <typename T,typename R,size_t N>
+	formula_cell<bool> lazy_comp(T lhs,formula_cell<R>& rhs,const char (&func) [N]) {
+		return lazy_comp(lhs,rhs,func,N);
+	}
+
 }
 
 // Formula_cell expression overloads
 // works, but relies on the formula_cell staying alive after the operation
 // if the formula_cell& gets deleted, value becomes 'permanent'
 // fine for normal use, but possibly difficult for chaining of temporary formula_cells
+// Can currently add two formula_cells together but cannot chain expressions
+
+// Have all operators return formula_cell<R>&&	?
+// Have overloads that accept the formula_cell<R>&& as is	?
 
 // Note: Formula_cell expression type conversions		given: (lhs {op} rhs)	(ex. lhs + rhs)
 // Operations between a formula_cell<T> and a value of R will result in a formula_cell<typeof(rhs)>
 
 template <typename T,typename R>
-cells::formula_cell<R> operator*(cells::formula_cell<T>& rhs,R lhs) {
+cells::formula_cell<R> operator*(cells::formula_cell<T>& lhs,R rhs) {
 	// capture cell by reference (ensure that the new cell gets updated according to the passed cell and not a copy cell)
 	// capture parameter by value (keep the parameter's value as part of the function)
-	return [=,&rhs] { return (R)rhs.get() * lhs; };
+	return [=,&lhs] { return (R)lhs.get() * rhs; };
 }
 template <typename T,typename R>
-cells::formula_cell<R> operator*(T rhs,cells::formula_cell<R>& lhs) {
-	return [=,&lhs] { return lhs.get() * (R)rhs; };
-}
-
-template <typename T,typename R>
-cells::formula_cell<R> operator+(cells::formula_cell<T>& rhs,R lhs) {
-	return [=,&rhs] { return (R)rhs.get() + lhs; };
+cells::formula_cell<R> operator*(T lhs,cells::formula_cell<R>& rhs) {
+	return [=,&rhs] { return (R)lhs * rhs.get(); };
 }
 template <typename T,typename R>
-cells::formula_cell<R> operator+(T rhs,cells::formula_cell<R>& lhs) {
-	return [=,&lhs] { return lhs.get() + (R)rhs; };
+cells::formula_cell<R> operator*(cells::formula_cell<T>& rhs,cells::formula_cell<R>& lhs) {
+	return [&] { return (R)lhs.get() * rhs.get(); };
 }
 
 template <typename T,typename R>
-cells::formula_cell<R> operator-(cells::formula_cell<T>& rhs,R lhs) {
-	return [=,&rhs] { return (R)rhs.get() - lhs; };
+cells::formula_cell<R> operator+(cells::formula_cell<T>& lhs,R rhs) {
+	return [=,&lhs] { return (R)lhs.get() + rhs; };
 }
 template <typename T,typename R>
-cells::formula_cell<R> operator-(T rhs,cells::formula_cell<R>& lhs) {
-	return [=,&lhs] { return lhs.get() - (R)rhs; };
+cells::formula_cell<R> operator+(T lhs,cells::formula_cell<R>& rhs) {
+	return [=,&rhs] { return (R)lhs + rhs.get(); };
+}
+template <typename T,typename R>
+cells::formula_cell<R> operator+(cells::formula_cell<T>& rhs,cells::formula_cell<R>& lhs) {
+	return [&] { return (R)lhs.get() + rhs.get(); };
+}
+/*
+cell<T>&&,R
+cell<T>&&,cell<R>&
+cell<T>&&,cell<R>&&
+T,cell<R>&&
+cell<T>&,cell<R>&&
+*/
+
+template <typename T,typename R>
+cells::formula_cell<R> operator-(cells::formula_cell<T>& lhs,R rhs) {
+	return [=,&lhs] { return (R)lhs.get() - rhs; };
+}
+template <typename T,typename R>
+cells::formula_cell<R> operator-(T lhs,cells::formula_cell<R>& rhs) {
+	return [=,&rhs] { return (R)lhs - rhs.get(); };
+}
+template <typename T,typename R>
+cells::formula_cell<R> operator-(cells::formula_cell<T>& rhs,cells::formula_cell<R>& lhs) {
+	return [&] { return (R)lhs.get() - rhs.get(); };
 }
 
 template <typename T,typename R>
-cells::formula_cell<R> operator/(cells::formula_cell<T>& rhs,R lhs) {
-	return [=,&rhs] { return (R)rhs.get() / lhs; };
+cells::formula_cell<R> operator/(cells::formula_cell<T>& lhs,R rhs) {
+	return [=,&lhs] { return (R)lhs.get() / rhs; };
 }
 template <typename T,typename R>
-cells::formula_cell<R> operator/(T rhs,cells::formula_cell<R>& lhs) {
-	return [=,&lhs] { return lhs.get() / (R)rhs; };
+cells::formula_cell<R> operator/(T lhs,cells::formula_cell<R>& rhs) {
+	return [=,&rhs] { return (R)lhs / rhs.get(); };
+}
+template <typename T,typename R>
+cells::formula_cell<R> operator/(cells::formula_cell<T>& rhs,cells::formula_cell<R>& lhs) {
+	return [&] { return (R)lhs.get() + rhs.get(); };
+}
+
+template <typename T,typename R>
+cells::formula_cell<T>& operator+=(cells::formula_cell<T>& lhs,R value) {
+	lhs = value + lhs;
+	return lhs;
+}
+template <typename T,typename R>
+cells::formula_cell<T>& operator-=(cells::formula_cell<T>& lhs,R value) {
+	lhs = lhs - (T)value;
+	return lhs;
+}
+template <typename T,typename R>
+cells::formula_cell<T>& operator/=(cells::formula_cell<T>& lhs,R value) {
+	lhs = lhs / (T)value ;
+	return lhs;
+}
+template <typename T,typename R>
+cells::formula_cell<T>& operator*=(cells::formula_cell<T>& lhs,R value) {
+	lhs = value * lhs;
+	return lhs;
 }

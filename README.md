@@ -61,7 +61,7 @@ with a formula to compute the value of the cell:
     x.reset([](){ return 5; });
     
 For convenience, you can also just write something like `x->reset(5);`,
-`x = reactive(5)`, or `x = 5` for setting a constant value.
+`x = lazy(5)`, or `x = 5` for setting a constant value.
 
 In order to create a dependent cell, simply make use of the other
 cell's value in the function or use the other cell in an expression:
@@ -93,7 +93,7 @@ It is possible to make use of the c++11 `auto` keyword by assigning
 to the result of the `reactive` function or by assigning to the result
 of an expression that involves a formula_cell. ex:
 
-	auto x = reactive(5);
+	auto x = lazy(5);
 	auto double_x = x * 2;
 	
 The overloaded expression operators are '*','/','-', and '+'
@@ -102,11 +102,18 @@ and are also overloaded two ways (a third is planned for chaining expressions)
 A `formula_cell<T>,R` and a `T,formula_cell<R>`
 These operations will always result in a `formula_cell<R>`
 
-	auto x = reactive(2.5);
+	auto x = lazy(2.5);
 	auto x_int = x * 2;				<-- Has a value of '4'
 	auto x_float = 2 * x;			<-- Has a value of '5'
 
+A function `lazy_comp` is also provided that, given a formula_cell, another value of
+(almost) any type, and a const char* conversion code, returns a formula_cell<bool>
+that is stores the result of the specified boolean operation.
 
+	auto x = lazy(7);
+	auto Boolean = lazy_comp(x,3,"!=");					<-- Boolean: value of x != 3
+	for(;Boolean;x-=1) std::cout << x << std::endl		<-- loop until Boolean is false (x==3). outputs: 7,6,5,4
+	
 ## Acknowledgments
 
 This work extends Matthias Andreas Benkard's cellspp library,
